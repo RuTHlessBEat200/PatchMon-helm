@@ -2,7 +2,7 @@ apiVersion: v2
 name: patchmon
 description: A Helm chart for PatchMon - Linux Patch Monitoring and Management System
 type: application
-version: 1.3.6
+version: 1.0.0
 appVersion: "v1.3.6"
 keywords:
   - patchmon
