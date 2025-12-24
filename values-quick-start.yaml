@@ -1,0 +1,52 @@
+global:
+  storageClass: "proxmox-data"
+
+fullnameOverride: "patchmon-dev"
+
+# Backend configuration
+backend:
+  env:
+    serverProtocol: https
+    serverHost: patchmon-dev.example.com
+    serverPort: "443"
+    corsOrigin: https://patchmon-dev.example.com
+
+# Frontend configuration
+frontend:
+  replicaCount: 2
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - frontend
+          topologyKey: "kubernetes.io/hostname"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: patchmon-dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: frontend
+            port: 3000
+  tls:
+    - secretName: patchmon-dev-tls
+      hosts:
+        - patchmon-dev.example.com

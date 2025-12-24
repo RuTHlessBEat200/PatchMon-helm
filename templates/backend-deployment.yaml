@@ -1,0 +1,215 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "patchmon.fullname" . }}-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "patchmon.backend.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  {{- if .Values.backend.updateStrategy }}
+  strategy:
+    {{- toYaml .Values.backend.updateStrategy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "patchmon.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "patchmon.backend.selectorLabels" . | nindent 8 }}
+      {{- with .Values.backend.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if and .Values.backend.initContainers.waitForDatabase.enabled .Values.database.enabled }}
+        - name: wait-for-database
+          image: busybox:latest
+          command:
+            - sh
+            - "-c"
+            - "until nc -z {{ include "patchmon.fullname" . }}-database {{ .Values.database.service.port }}; do echo waiting for database; sleep 2; done"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 65534
+        {{- end }}
+        {{- if and .Values.backend.initContainers.waitForRedis.enabled .Values.redis.enabled }}
+        - name: wait-for-redis
+          image: busybox:latest
+          command:
+            - sh
+            - "-c"
+            - "until nc -z {{ include "patchmon.fullname" . }}-redis {{ .Values.redis.service.port }}; do echo waiting for redis; sleep 2; done"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 65534
+        {{- end }}
+        {{- if .Values.backend.initContainers.fixPermissions.enabled }}
+        - name: fix-permissions
+          image: busybox:latest
+          command:
+            - sh
+            - "-c"
+            - "chown -R 1000:1000 /app/agents"
+          volumeMounts:
+            - name: agent-files
+              mountPath: /app/agents
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+            runAsNonRoot: false
+            runAsUser: 0
+        {{- end }}
+      containers:
+        - name: backend
+          image: {{ include "patchmon.backend.image" . }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.backend.env.logLevel | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "patchmon.database.secretName" . }}
+                  key: {{ .Values.database.auth.existingSecretPasswordKey }}
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.database.auth.username }}:$(POSTGRES_PASSWORD)@{{ include "patchmon.fullname" . }}-database:{{ .Values.database.service.port }}/{{ .Values.database.auth.database }}"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "patchmon.backend.secretName" . }}
+                  key: {{ .Values.backend.existingSecretJwtKey }}
+            - name: SERVER_PROTOCOL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "patchmon.configMapName" . }}
+                  key: SERVER_PROTOCOL
+            - name: SERVER_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "patchmon.configMapName" . }}
+                  key: SERVER_HOST
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "patchmon.configMapName" . }}
+                  key: SERVER_PORT
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "patchmon.configMapName" . }}
+                  key: CORS_ORIGIN
+            - name: DB_CONNECTION_LIMIT
+              value: {{ .Values.backend.env.dbConnectionLimit | quote }}
+            - name: DB_POOL_TIMEOUT
+              value: {{ .Values.backend.env.dbPoolTimeout | quote }}
+            - name: DB_CONNECT_TIMEOUT
+              value: {{ .Values.backend.env.dbConnectTimeout | quote }}
+            - name: DB_IDLE_TIMEOUT
+              value: {{ .Values.backend.env.dbIdleTimeout | quote }}
+            - name: DB_MAX_LIFETIME
+              value: {{ .Values.backend.env.dbMaxLifetime | quote }}
+            - name: RATE_LIMIT_WINDOW_MS
+              value: {{ .Values.backend.env.rateLimitWindowMs | quote }}
+            - name: RATE_LIMIT_MAX
+              value: {{ .Values.backend.env.rateLimitMax | quote }}
+            - name: AUTH_RATE_LIMIT_WINDOW_MS
+              value: {{ .Values.backend.env.authRateLimitWindowMs | quote }}
+            - name: AUTH_RATE_LIMIT_MAX
+              value: {{ .Values.backend.env.authRateLimitMax | quote }}
+            - name: AGENT_RATE_LIMIT_WINDOW_MS
+              value: {{ .Values.backend.env.agentRateLimitWindowMs | quote }}
+            - name: AGENT_RATE_LIMIT_MAX
+              value: {{ .Values.backend.env.agentRateLimitMax | quote }}
+            - name: REDIS_HOST
+              value: {{ include "patchmon.fullname" . }}-redis
+            - name: REDIS_PORT
+              value: {{ .Values.redis.service.port | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "patchmon.redis.secretName" . }}
+                  key: {{ .Values.redis.auth.existingSecretPasswordKey }}
+            - name: REDIS_DB
+              value: {{ .Values.backend.env.redisDb | quote }}
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+          {{- if .Values.backend.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.livenessProbe.httpGet.path }}
+              port: {{ .Values.backend.livenessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.backend.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.readinessProbe.httpGet.path }}
+              port: {{ .Values.backend.readinessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.backend.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: agent-files
+              mountPath: /app/agents
+      volumes:
+        - name: agent-files
+          persistentVolumeClaim:
+            claimName: {{ include "patchmon.fullname" . }}-agent-files
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
