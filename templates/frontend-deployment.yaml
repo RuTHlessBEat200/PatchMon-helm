@@ -41,7 +41,7 @@ spec:
       initContainers:
         {{- if and .Values.frontend.initContainers.waitForBackend.enabled .Values.backend.enabled }}
         - name: wait-for-backend
-          image: busybox:latest
+          image: {{ include "patchmon.initContainer.image" . }}
           command:
             - sh
             - "-c"

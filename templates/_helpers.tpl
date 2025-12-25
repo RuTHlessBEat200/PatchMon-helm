@@ -252,3 +252,15 @@ Common annotations
 {{ toYaml . }}
 {{- end }}
 {{- end }}
+
+{{/*
+Return the proper init container image name (busybox)
+*/}}
+{{- define "patchmon.initContainer.image" -}}
+{{- $registry := .Values.global.imageRegistry -}}
+{{- if $registry -}}
+{{- printf "%s/busybox:latest" $registry -}}
+{{- else -}}
+busybox:latest
+{{- end -}}
+{{- end -}}
