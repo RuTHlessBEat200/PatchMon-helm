@@ -1,0 +1,47 @@
+# Examplary values for production deployment of PatchMon with a RWO storage class and ingress
+global:
+  storageClass: "proxmox-data"
+
+fullnameOverride: "patchmon-prod"
+
+# Use KSOPS to manage secrets in production or other secure methods
+
+backend:
+  env:
+    serverProtocol: https
+    serverHost: patchmon.example.com
+    serverPort: "443"
+    corsOrigin: https://patchmon.example.com
+  existingSecret: "patchmon-secrets"
+  existingSecretJwtKey: "jwt-secret"
+
+database:
+  auth:
+    existingSecret: patchmon-secrets
+    existingSecretPasswordKey: postgres-password
+
+redis:
+  auth:
+    existingSecret: patchmon-secrets
+    existingSecretPasswordKey: redis-password
+
+secret:
+  create: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: patchmon.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: frontend
+            port: 3000
+  tls:
+    - secretName: patchmon-tls
+      hosts:
+        - patchmon.example.com

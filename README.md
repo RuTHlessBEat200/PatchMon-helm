@@ -6,7 +6,7 @@ A production-ready Helm chart for deploying PatchMon, a comprehensive Linux patc
 
 - 🚀 **Complete Stack Deployment**: PostgreSQL 18-alpine, Redis 8-alpine, Backend API, and Frontend UI
 - 🔧 **Highly Configurable**: Extensive values.yaml with sensible defaults
-- 🔐 **Security First**: Non-root containers, auto-generated secrets, seccomp profiles, minimal capabilities
+- 🔐 **Security First**: Non-root containers, auto-generated secrets (preserved on upgrades), seccomp profiles, minimal capabilities
 - 📈 **Auto-scaling**: HPA support for backend and frontend
 - 🏷️ **Flexible Naming**: Global name overrides for multi-tenant deployments
 - 💾 **Persistent Storage**: Configurable storage classes and sizes
@@ -51,6 +51,79 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f custom-values
 ```
 
 **Note**: Browse available versions at https://github.com/RuTHlessBEat200/PatchMon-helm/releases
+
+### Production Deployment
+
+For production deployments, use external secret management instead of auto-generated secrets. See the [production example](values-prod.yaml) for a complete configuration.
+
+**Secret Management Best Practices:**
+
+The chart supports integration with secure secret management tools:
+
+- **[KSOPS](https://github.com/viaduct-ai/kustomize-sops)** - Encrypt secrets in Git using Mozilla SOPS
+- **[Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets)** - Encrypt secrets that only the cluster can decrypt
+- **[External Secrets Operator](https://external-secrets.io/)** - Sync secrets from external secret stores (Vault, AWS Secrets Manager, etc.)
+- **[Vault](https://www.vaultproject.io/)** - Enterprise-grade secret management
+
+**Production example** ([values-prod.yaml](values-prod.yaml)):
+
+```yaml
+global:
+  storageClass: "proxmox-data"
+
+fullnameOverride: "patchmon-prod"
+
+# Reference existing secrets (managed by KSOPS or other tools)
+backend:
+  env:
+    serverProtocol: https
+    serverHost: patchmon.example.com
+    serverPort: "443"
+    corsOrigin: https://patchmon.example.com
+  existingSecret: "patchmon-secrets"
+  existingSecretJwtKey: "jwt-secret"
+
+database:
+  auth:
+    existingSecret: patchmon-secrets
+    existingSecretPasswordKey: postgres-password
+
+redis:
+  auth:
+    existingSecret: patchmon-secrets
+    existingSecretPasswordKey: redis-password
+
+# Disable auto-generated secrets
+secret:
+  create: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: patchmon.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service:
+            name: frontend
+            port: 3000
+  tls:
+    - secretName: patchmon-tls
+      hosts:
+        - patchmon.example.com
+```
+
+**Deploy with production values:**
+
+```bash
+helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  --namespace patchmon \
+  --create-namespace \
+  --values values-prod.yaml
+```
 
 ### Basic Configuration
 
@@ -99,7 +172,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `global.imageRegistry` | Global Docker registry override | `""` |
+| `global.imageRegistry` | Global Docker registry override (takes priority over component registries) | `""` |
 | `global.imagePullSecrets` | Global image pull secrets | `[]` |
 | `global.storageClass` | Global storage class for all PVCs | `""` |
 | `nameOverride` | Override chart name | `""` |
@@ -142,7 +215,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 | `backend.enabled` | Enable backend deployment | `true` |
 | `backend.image.registry` | Backend image registry | `ghcr.io` |
 | `backend.image.repository` | Backend image repository | `patchmon/patchmon-backend` |
-| `backend.image.tag` | Backend image tag | `1.3.6` |
+| `backend.image.tag` | Backend image tag | `1.3.7` |
 | `backend.replicaCount` | Number of backend replicas | `1` (>1 requires RWX storage) |
 | `backend.jwtSecret` | JWT secret (auto-generated if empty) | `""` |
 | `backend.env.serverProtocol` | Server protocol | `http` |
@@ -163,7 +236,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 | `frontend.enabled` | Enable frontend deployment | `true` |
 | `frontend.image.registry` | Frontend image registry | `ghcr.io` |
 | `frontend.image.repository` | Frontend image repository | `patchmon/patchmon-frontend` |
-| `frontend.image.tag` | Frontend image tag | `1.3.6` |
+| `frontend.image.tag` | Frontend image tag | `1.3.7` |
 | `frontend.replicaCount` | Number of frontend replicas | `1` |
 | `frontend.autoscaling.enabled` | Enable HPA for frontend | `false` |
 | `frontend.autoscaling.minReplicas` | Minimum replicas | `1` |
@@ -203,15 +276,23 @@ ingress:
 
 ### Custom Image Registry
 
+Use a custom registry for all images:
+
 ```yaml
 global:
-  imageRegistry: "my-registry.example.com"
-
-backend:
-  image:
-    registry: ""  # Will use global registry
-    repository: "my-org/patchmon-backend"
+  imageRegistry: "registry.example.com"
 ```
+
+This will override component-specific registries and pull all images from your registry:
+- `registry.example.com/postgres:18-alpine`
+- `registry.example.com/redis:8-alpine`
+- `registry.example.com/patchmon/patchmon-backend:1.3.7`
+- `registry.example.com/patchmon/patchmon-frontend:1.3.7`
+- `registry.example.com/busybox:latest` (init containers)
+
+Without `global.imageRegistry`, components use their default registries:
+- Database/Redis: `docker.io`
+- Backend/Frontend: `ghcr.io`
 
 ### External Secrets
 
@@ -268,13 +349,26 @@ backend:
 
 ```bash
 # Upgrade with new values
-helm upgrade patchmon ./patchmon -n patchmon -f values.yaml
+helm upgrade patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  -n patchmon \
+  -f values.yaml
 
 # Upgrade and wait for rollout
-helm upgrade patchmon ./patchmon -n patchmon -f values.yaml --wait --timeout 10m
+helm upgrade patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  -n patchmon \
+  -f values.yaml \
+  --wait --timeout 10m
 ```
 
-**Note**: Secrets are auto-generated on first install. For upgrades, existing secrets are preserved. Back up your secrets before upgrading:
+**Secret Handling on Upgrades:**
+
+Auto-generated secrets are **automatically preserved** across upgrades using Helm's `lookup` function. This prevents authentication failures when upgrading:
+
+- **First install**: Generates random passwords for database, Redis, and JWT
+- **Upgrades**: Reuses existing passwords from the cluster
+- **Manual override**: Set explicit passwords in `values.yaml` to override
+
+It's still recommended to back up secrets before major upgrades:
 
 ```bash
 kubectl get secret -n patchmon -o yaml > patchmon-secrets-backup.yaml

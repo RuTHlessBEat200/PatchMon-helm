@@ -134,10 +134,10 @@ Create the name of the service account to use
 Get the proper image registry
 */}}
 {{- define "patchmon.imageRegistry" -}}
-{{- if .registry -}}
-{{- .registry -}}
-{{- else if .global -}}
+{{- if .global.imageRegistry -}}
 {{- .global.imageRegistry -}}
+{{- else if .registry -}}
+{{- .registry -}}
 {{- end -}}
 {{- end -}}
 
@@ -261,6 +261,6 @@ Return the proper init container image name (busybox)
 {{- if $registry -}}
 {{- printf "%s/busybox:latest" $registry -}}
 {{- else -}}
-busybox:latest
+docker.io/busybox:latest
 {{- end -}}
 {{- end -}}
