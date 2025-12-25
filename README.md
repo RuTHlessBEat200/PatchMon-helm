@@ -28,17 +28,29 @@ A production-ready Helm chart for deploying PatchMon, a comprehensive Linux patc
 ### Quick Start
 
 ```bash
-# TODO
-# Add the repository (when published)
-# helm repo add patchmon https://your-repo-url
-# helm repo update
-
-# Install with default values
-helm install patchmon ./patchmon -n patchmon --create-namespace
+# Install from OCI registry with default values (latest version)
+helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  --namespace patchmon \
+  --create-namespace
 
 # Install with custom values
+helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  --namespace patchmon \
+  --create-namespace \
+  --values custom-values.yaml
+
+# Or install a specific version
+helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
+  --version 1.1.0 \
+  --namespace patchmon \
+  --create-namespace
+
+# Pull the chart first, then install
+helm pull oci://ghcr.io/ruthlessbeat200/charts/patchmon --untar
 helm install patchmon ./patchmon -n patchmon --create-namespace -f custom-values.yaml
 ```
+
+**Note**: Browse available versions at https://github.com/RuTHlessBEat200/PatchMon-helm/releases
 
 ### Basic Configuration
 

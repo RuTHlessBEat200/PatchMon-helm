@@ -41,7 +41,29 @@ jobs:
             exit 1
           fi
           
-          echo "Version verification passed"
+          echo "Chart version verification passed"
+
+      - name: Verify appVersion matches image tags
+        run: |
+          APP_VERSION=$(grep '^appVersion:' Chart.yaml | awk '{print $2}' | tr -d '"v')
+          BACKEND_TAG=$(grep -A 5 '^backend:' values.yaml | grep 'tag:' | awk '{print $2}' | tr -d '"')
+          FRONTEND_TAG=$(grep -A 5 '^frontend:' values.yaml | grep 'tag:' | awk '{print $2}' | tr -d '"')
+          
+          echo "Chart.yaml appVersion: $APP_VERSION"
+          echo "Backend image tag: $BACKEND_TAG"
+          echo "Frontend image tag: $FRONTEND_TAG"
+          
+          if [ "$APP_VERSION" != "$BACKEND_TAG" ]; then
+            echo "ERROR: appVersion ($APP_VERSION) does not match backend tag ($BACKEND_TAG)"
+            exit 1
+          fi
+          
+          if [ "$APP_VERSION" != "$FRONTEND_TAG" ]; then
+            echo "ERROR: appVersion ($APP_VERSION) does not match frontend tag ($FRONTEND_TAG)"
+            exit 1
+          fi
+          
+          echo "appVersion verification passed"
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
