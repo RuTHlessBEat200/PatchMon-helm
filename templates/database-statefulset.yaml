@@ -37,6 +37,21 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        - name: fix-permissions
+          image: {{ include "patchmon.database.image" . }}
+          command:
+            - sh
+            - -c
+            - |
+              chown -R {{ .Values.database.podSecurityContext.runAsUser }}:{{ .Values.database.podSecurityContext.runAsGroup }} /var/lib/postgresql/data
+              chmod 700 /var/lib/postgresql/data
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: postgres
           image: {{ include "patchmon.database.image" . }}
