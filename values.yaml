@@ -230,6 +230,7 @@ backend:
     targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
   
+
   # Environment variables
   env:
     logLevel: info
@@ -253,11 +254,44 @@ backend:
     agentRateLimitMax: "1000"
     # Redis configuration
     redisDb: "0"
+    # Security
+    trustProxy: false
+    enableHsts: false
+    # User management
+    defaultUserRole: "user"
+    autoCreateRolePermissions: false
   
   # JWT secret - leave empty to auto-generate
   jwtSecret: ""
   existingSecret: ""
   existingSecretJwtKey: "jwt-secret"
+  
+  # AI encryption key - leave empty to auto-generate (32 bytes hex)
+  aiEncryptionKey: ""
+  existingSecretAiEncryptionKey: "ai-encryption-key"
+  
+  # OIDC configuration
+  oidc:
+    enabled: false
+    issuerUrl: ""
+    clientId: ""
+    clientSecret: ""
+    existingSecret: ""
+    existingSecretClientSecretKey: "oidc-client-secret"
+    scopes: "openid profile email"
+    buttonText: "Login with SSO"
+    autoCreateUsers: false
+    defaultRole: "user"
+    syncRoles: false
+    disableLocalAuth: false
+    sessionTtl: 86400
+    # Group mapping for role synchronization
+    groups:
+      superadmin: ""
+      admin: ""
+      hostManager: ""
+      user: ""
+      readonly: ""
   
   # Agent files persistence
   persistence:

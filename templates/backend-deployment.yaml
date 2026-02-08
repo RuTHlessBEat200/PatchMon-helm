@@ -161,6 +161,72 @@ spec:
                   key: {{ .Values.redis.auth.existingSecretPasswordKey }}
             - name: REDIS_DB
               value: {{ .Values.backend.env.redisDb | quote }}
+            - name: TRUST_PROXY
+              value: {{ .Values.backend.env.trustProxy | quote }}
+            - name: ENABLE_HSTS
+              value: {{ .Values.backend.env.enableHsts | quote }}
+            - name: DEFAULT_USER_ROLE
+              value: {{ .Values.backend.env.defaultUserRole | quote }}
+            - name: AUTO_CREATE_ROLE_PERMISSIONS
+              value: {{ .Values.backend.env.autoCreateRolePermissions | quote }}
+            - name: AI_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "patchmon.backend.secretName" . }}
+                  key: {{ .Values.backend.existingSecretAiEncryptionKey }}
+            - name: FRONTEND_URL
+              value: {{ include "patchmon.oidc.postLogoutUri" . | quote }}
+            {{- if .Values.backend.oidc.enabled }}
+            - name: OIDC_ENABLED
+              value: {{ .Values.backend.oidc.enabled | quote }}
+            - name: OIDC_ISSUER_URL
+              value: {{ .Values.backend.oidc.issuerUrl | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.backend.oidc.clientId | quote }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "patchmon.backend.secretName" . }}
+                  key: {{ .Values.backend.oidc.existingSecretClientSecretKey }}
+            - name: OIDC_REDIRECT_URI
+              value: {{ include "patchmon.oidc.redirectUri" . | quote }}
+            - name: OIDC_POST_LOGOUT_URI
+              value: {{ include "patchmon.oidc.postLogoutUri" . | quote }}
+            - name: OIDC_SCOPES
+              value: {{ .Values.backend.oidc.scopes | quote }}
+            - name: OIDC_BUTTON_TEXT
+              value: {{ .Values.backend.oidc.buttonText | quote }}
+            - name: OIDC_AUTO_CREATE_USERS
+              value: {{ .Values.backend.oidc.autoCreateUsers | quote }}
+            - name: OIDC_DEFAULT_ROLE
+              value: {{ .Values.backend.oidc.defaultRole | quote }}
+            - name: OIDC_SYNC_ROLES
+              value: {{ .Values.backend.oidc.syncRoles | quote }}
+            - name: OIDC_DISABLE_LOCAL_AUTH
+              value: {{ .Values.backend.oidc.disableLocalAuth | quote }}
+            - name: OIDC_SESSION_TTL
+              value: {{ .Values.backend.oidc.sessionTtl | quote }}
+            {{- if .Values.backend.oidc.groups.superadmin }}
+            - name: OIDC_SUPERADMIN_GROUP
+              value: {{ .Values.backend.oidc.groups.superadmin | quote }}
+            {{- end }}
+            {{- if .Values.backend.oidc.groups.admin }}
+            - name: OIDC_ADMIN_GROUP
+              value: {{ .Values.backend.oidc.groups.admin | quote }}
+            {{- end }}
+            {{- if .Values.backend.oidc.groups.hostManager }}
+            - name: OIDC_HOST_MANAGER_GROUP
+              value: {{ .Values.backend.oidc.groups.hostManager | quote }}
+            {{- end }}
+            {{- if .Values.backend.oidc.groups.user }}
+            - name: OIDC_USER_GROUP
+              value: {{ .Values.backend.oidc.groups.user | quote }}
+            {{- end }}
+            {{- if .Values.backend.oidc.groups.readonly }}
+            - name: OIDC_READONLY_GROUP
+              value: {{ .Values.backend.oidc.groups.readonly | quote }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 3001
