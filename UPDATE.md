@@ -15,7 +15,7 @@ Edit `Chart.yaml` and update the following fields:
 
 ```yaml
 version: 1.0.0        # Increment chart version (see version scheme below)
-appVersion: v1.3.7    # Update to new PatchMon version
+appVersion: v1.4.0    # Update to new PatchMon version
 ```
 
 **Chart Version Scheme (Semantic Versioning):**
@@ -43,7 +43,7 @@ The chart version follows `MAJOR.MINOR.PATCH`:
 
 **Examples:**
 - `1.0.0 → 2.0.0`: PostgreSQL 18 → 19 upgrade (MAJOR)
-- `1.0.0 → 1.1.0`: PatchMon v1.3.6 → v1.3.7 (MINOR)
+- `1.0.0 → 1.1.0`: PatchMon v1.3.6 → v1.4.0 (MINOR)
 - `1.0.0 → 1.0.1`: Fixed probe configuration (PATCH)
 
 ### 2. Update Image Tags
@@ -56,7 +56,7 @@ backend:
   image:
     registry: ghcr.io
     repository: patchmon/patchmon-backend
-    tag: "1.3.7"      # Update this
+    tag: "1.4.0"      # Update this
     pullPolicy: Always
 ```
 
@@ -66,7 +66,7 @@ frontend:
   image:
     registry: ghcr.io
     repository: patchmon/patchmon-frontend
-    tag: "1.3.7"      # Update this
+    tag: "1.4.0"      # Update this
     pullPolicy: IfNotPresent
 ```
 
