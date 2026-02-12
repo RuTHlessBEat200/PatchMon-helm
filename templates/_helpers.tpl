@@ -264,3 +264,31 @@ Return the proper init container image name (busybox)
 docker.io/busybox:latest
 {{- end -}}
 {{- end -}}
+
+{{/*
+Return the OIDC redirect URI based on ingress configuration
+*/}}
+{{- define "patchmon.oidc.redirectUri" -}}
+{{- if .Values.ingress.enabled -}}
+{{- $host := (index .Values.ingress.hosts 0).host -}}
+{{- $protocol := "http" -}}
+{{- if .Values.ingress.tls -}}
+{{- $protocol = "https" -}}
+{{- end -}}
+{{- printf "%s://%s/api/v1/oidc/callback" $protocol $host -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the OIDC post logout URI based on ingress configuration
+*/}}
+{{- define "patchmon.oidc.postLogoutUri" -}}
+{{- if .Values.ingress.enabled -}}
+{{- $host := (index .Values.ingress.hosts 0).host -}}
+{{- $protocol := "http" -}}
+{{- if .Values.ingress.tls -}}
+{{- $protocol = "https" -}}
+{{- end -}}
+{{- printf "%s://%s" $protocol $host -}}
+{{- end -}}
+{{- end -}}
