@@ -9,6 +9,19 @@ backend:
     serverHost: patchmon-dev.example.com
     serverPort: "443"
     corsOrigin: https://patchmon-dev.example.com
+  jwtSecret: "quick-start-jwt-secret"
+  aiEncryptionKey: "quick-start-ai-encryption-key"
+  oidc:
+    enabled: false
+    clientSecret: "quick-start-oidc-client-secret"
+
+database:
+  auth:
+    password: "quick-start-db-password"
+
+redis:
+  auth:
+    password: "quick-start-redis-password"
 
 ingress:
   enabled: true
@@ -23,6 +36,11 @@ ingress:
           service:
             name: frontend
             port: 3000
+        - path: /api
+          pathType: Prefix
+          service:
+            name: backend
+            port: 3001
   tls:
     - secretName: patchmon-dev-tls
       hosts:

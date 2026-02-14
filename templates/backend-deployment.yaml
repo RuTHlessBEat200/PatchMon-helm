@@ -94,8 +94,12 @@ spec:
           image: {{ include "patchmon.backend.image" . }}
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
           env:
+            - name: ENABLE_LOGGING
+              value: {{ .Values.backend.env.enableLogging | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.backend.env.logLevel | quote }}
+            - name: PM_LOG_TO_CONSOLE
+              value: {{ .Values.backend.env.logToConsole | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:

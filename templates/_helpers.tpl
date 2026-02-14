@@ -269,13 +269,13 @@ docker.io/busybox:latest
 Return the OIDC redirect URI based on ingress configuration
 */}}
 {{- define "patchmon.oidc.redirectUri" -}}
-{{- if .Values.ingress.enabled -}}
-{{- $host := (index .Values.ingress.hosts 0).host -}}
-{{- $protocol := "http" -}}
-{{- if .Values.ingress.tls -}}
-{{- $protocol = "https" -}}
-{{- end -}}
-{{- printf "%s://%s/api/v1/oidc/callback" $protocol $host -}}
+{{- $host := .Values.backend.env.serverHost -}}
+{{- $protocol := .Values.backend.env.serverProtocol | default "http" -}}
+{{- $port := .Values.backend.env.serverPort | default "80" -}}
+{{- if or (eq $port "80") (eq $port "443") -}}
+{{- printf "%s://%s/api/v1/auth/oidc/callback" $protocol $host -}}
+{{- else -}}
+{{- printf "%s://%s:%s/api/v1/aurh/oidc/callback" $protocol $host $port -}}
 {{- end -}}
 {{- end -}}
 
@@ -283,12 +283,12 @@ Return the OIDC redirect URI based on ingress configuration
 Return the OIDC post logout URI based on ingress configuration
 */}}
 {{- define "patchmon.oidc.postLogoutUri" -}}
-{{- if .Values.ingress.enabled -}}
-{{- $host := (index .Values.ingress.hosts 0).host -}}
-{{- $protocol := "http" -}}
-{{- if .Values.ingress.tls -}}
-{{- $protocol = "https" -}}
-{{- end -}}
+{{- $host := .Values.backend.env.serverHost -}}
+{{- $protocol := .Values.backend.env.serverProtocol | default "http" -}}
+{{- $port := .Values.backend.env.serverPort | default "80" -}}
+{{- if or (eq $port "80") (eq $port "443") -}}
 {{- printf "%s://%s" $protocol $host -}}
+{{- else -}}
+{{- printf "%s://%s:%s" $protocol $host $port -}}
 {{- end -}}
 {{- end -}}

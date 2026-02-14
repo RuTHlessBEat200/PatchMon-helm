@@ -34,7 +34,6 @@ database:
   auth:
     database: patchmon_db
     username: patchmon_user
-    # Leave empty to auto-generate, or specify your own
     password: ""
     existingSecret: ""
     existingSecretPasswordKey: "postgres-password"
@@ -122,7 +121,6 @@ redis:
   
   # Redis authentication
   auth:
-    # Leave empty to auto-generate, or specify your own
     password: ""
     existingSecret: ""
     existingSecretPasswordKey: "redis-password"
@@ -233,7 +231,10 @@ backend:
 
   # Environment variables
   env:
+    # Logging
+    enableLogging: true
     logLevel: info
+    logToConsole: true
     # Server configuration
     serverProtocol: http # http or https (if https, configure ingress accordingly)
     serverHost: patchmon.example.com
@@ -261,12 +262,10 @@ backend:
     defaultUserRole: "user"
     autoCreateRolePermissions: false
   
-  # JWT secret - leave empty to auto-generate
   jwtSecret: ""
   existingSecret: ""
   existingSecretJwtKey: "jwt-secret"
   
-  # AI encryption key - leave empty to auto-generate (32 bytes hex)
   aiEncryptionKey: ""
   existingSecret: ""
   existingSecretAiEncryptionKey: "ai-encryption-key"
@@ -475,6 +474,11 @@ ingress:
           service:
             name: frontend
             port: 3000
+        - path: /api
+          pathType: Prefix
+          service:
+            name: backend
+            port: 3001
   # tls:
   #   - secretName: patchmon-tls
   #     hosts:

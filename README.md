@@ -6,7 +6,7 @@ A production-ready Helm chart for deploying PatchMon, a comprehensive Linux patc
 
 - 🚀 **Complete Stack Deployment**: PostgreSQL 18-alpine, Redis 8-alpine, Backend API, and Frontend UI
 - 🔧 **Highly Configurable**: Extensive values.yaml with sensible defaults
-- 🔐 **Security First**: Non-root containers, auto-generated secrets (preserved on upgrades), seccomp profiles, minimal capabilities
+- 🔐 **Security First**: Non-root containers, user-provided secrets, seccomp profiles, minimal capabilities
 - 📈 **Auto-scaling**: HPA support for backend and frontend
 - 🏷️ **Flexible Naming**: Global name overrides for multi-tenant deployments
 - 💾 **Persistent Storage**: Configurable storage classes and sizes
@@ -54,7 +54,6 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f custom-values
 
 ### Production Deployment
 
-For production deployments, use external secret management instead of auto-generated secrets. See the [production example](values-prod.yaml) for a complete configuration.
 
 **Secret Management Best Practices:**
 
@@ -68,12 +67,14 @@ The chart supports integration with secure secret management tools:
 **Production example** ([values-prod.yaml](values-prod.yaml)):
 
 ```yaml
+# Examplary values for production deployment of PatchMon with a RWO storage class and ingress
 global:
   storageClass: "proxmox-data"
 
 fullnameOverride: "patchmon-prod"
 
-# Reference existing secrets (managed by KSOPS or other tools)
+# Use KSOPS to manage secrets in production or other secure methods
+
 backend:
   env:
     serverProtocol: https
@@ -82,6 +83,10 @@ backend:
     corsOrigin: https://patchmon.example.com
   existingSecret: "patchmon-secrets"
   existingSecretJwtKey: "jwt-secret"
+  existingSecretAiEncryptionKey: "ai-encryption-key"
+  oidc:
+    enabled: false
+    existingSecretClientSecretKey: "oidc-client-secret"
 
 database:
   auth:
@@ -93,7 +98,6 @@ redis:
     existingSecret: patchmon-secrets
     existingSecretPasswordKey: redis-password
 
-# Disable auto-generated secrets
 secret:
   create: false
 
@@ -110,6 +114,11 @@ ingress:
           service:
             name: frontend
             port: 3000
+        - path: /api
+          pathType: Prefix
+          service:
+            name: backend
+            port: 3001
   tls:
     - secretName: patchmon-tls
       hosts:
@@ -123,47 +132,6 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
   --namespace patchmon \
   --create-namespace \
   --values values-prod.yaml
-```
-
-### Basic Configuration
-
-Create a `values.yaml` file with your configuration:
-
-```yaml
-# Basic configuration
-fullnameOverride: "patchmon-hosting1"  # All resources will be prefixed with this name
-
-global:
-  storageClass: "proxmox-data"
-
-backend:
-  env:
-    serverProtocol: https
-    serverHost: patchmon.example.com
-    serverPort: "443"
-    corsOrigin: https://patchmon.example.com
-
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: patchmon.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-          service:
-            name: frontend
-            port: 3000
-  tls:
-    - secretName: patchmon-tls
-      hosts:
-        - patchmon.example.com
-```
-
-Then install:
-
-```bash
-helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 ```
 
 ## Configuration
@@ -187,7 +155,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 | `database.image.tag` | PostgreSQL image tag | `18-alpine` |
 | `database.auth.database` | Database name | `patchmon_db` |
 | `database.auth.username` | Database user | `patchmon_user` |
-| `database.auth.password` | Database password (auto-generated if empty) | `""` |
+| `database.auth.password` | Database password (**must be set or use existingSecret**) | `""` |
 | `database.persistence.size` | Database PVC size | `5Gi` |
 | `database.persistence.storageClass` | Storage class for database | Uses global |
 | `database.updateStrategy.type` | StatefulSet update strategy | `RollingUpdate` |
@@ -201,7 +169,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 | `redis.enabled` | Enable Redis deployment | `true` |
 | `redis.image.repository` | Redis image repository | `redis` |
 | `redis.image.tag` | Redis image tag | `8-alpine` |
-| `redis.auth.password` | Redis password (auto-generated if empty) | `""` |
+| `redis.auth.password` | Redis password (**must be set or use existingSecret**) | `""` |
 | `redis.persistence.size` | Redis PVC size | `5Gi` |
 | `redis.persistence.storageClass` | Storage class for Redis | Uses global |
 | `redis.updateStrategy.type` | StatefulSet update strategy | `RollingUpdate` |
@@ -217,7 +185,7 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f values.yaml
 | `backend.image.repository` | Backend image repository | `patchmon/patchmon-backend` |
 | `backend.image.tag` | Backend image tag | `1.4.0` |
 | `backend.replicaCount` | Number of backend replicas | `1` (>1 requires RWX storage) |
-| `backend.jwtSecret` | JWT secret (auto-generated if empty) | `""` |
+| `backend.jwtSecret` | JWT secret (**must be set or use existingSecret**) | `""` |
 | `backend.env.serverProtocol` | Server protocol | `http` |
 | `backend.env.serverHost` | Server hostname | `patchmon.example.com` |
 | `backend.env.serverPort` | Server port | `80` |
@@ -296,22 +264,27 @@ Without `global.imageRegistry`, components use their default registries:
 
 ### External Secrets
 
-Use existing secrets instead of auto-generated ones:
+Use existing secrets or set secrets directly in values files. Secrets must be set explicitly; auto-generation is not supported:
 
 ```yaml
 database:
   auth:
     existingSecret: "my-db-secret"
     existingSecretPasswordKey: "password"
+    # password: "your-db-password"
 
 redis:
   auth:
     existingSecret: "my-redis-secret"
     existingSecretPasswordKey: "password"
+    # password: "your-redis-password"
 
 backend:
   existingSecret: "my-backend-secret"
   existingSecretJwtKey: "jwt-secret"
+  existingSecretAiEncryptionKey: "ai-encryption-key"
+  oidc:
+    existingSecretClientSecretKey: "oidc-client-secret"
 ```
 
 ### Enable Auto-scaling
@@ -360,19 +333,10 @@ helm upgrade patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
   --wait --timeout 10m
 ```
 
+
 **Secret Handling on Upgrades:**
 
-Auto-generated secrets are **automatically preserved** across upgrades using Helm's `lookup` function. This prevents authentication failures when upgrading:
-
-- **First install**: Generates random passwords for database, Redis, and JWT
-- **Upgrades**: Reuses existing passwords from the cluster
-- **Manual override**: Set explicit passwords in `values.yaml` to override
-
-It's still recommended to back up secrets before major upgrades:
-
-```bash
-kubectl get secret -n patchmon -o yaml > patchmon-secrets-backup.yaml
-```
+Secrets must be set explicitly in your values files or managed externally. The chart will fail to install or upgrade if required secrets are not provided.
 
 ## Uninstalling
 
