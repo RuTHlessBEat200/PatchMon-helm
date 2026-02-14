@@ -170,10 +170,14 @@ Return the proper backend image name
 */}}
 {{- define "patchmon.backend.image" -}}
 {{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.backend.image.registry "global" .Values.global) -}}
+{{- $tag := .Values.backend.image.tag -}}
+{{- if .Values.global.imageTag -}}
+{{- $tag = .Values.global.imageTag -}}
+{{- end -}}
 {{- if $registry -}}
-{{- printf "%s/%s:%s" $registry .Values.backend.image.repository .Values.backend.image.tag -}}
+{{- printf "%s/%s:%s" $registry .Values.backend.image.repository $tag -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.backend.image.repository .Values.backend.image.tag -}}
+{{- printf "%s:%s" .Values.backend.image.repository $tag -}}
 {{- end -}}
 {{- end -}}
 
@@ -182,10 +186,14 @@ Return the proper frontend image name
 */}}
 {{- define "patchmon.frontend.image" -}}
 {{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.frontend.image.registry "global" .Values.global) -}}
+{{- $tag := .Values.frontend.image.tag -}}
+{{- if .Values.global.imageTag -}}
+{{- $tag = .Values.global.imageTag -}}
+{{- end -}}
 {{- if $registry -}}
-{{- printf "%s/%s:%s" $registry .Values.frontend.image.repository .Values.frontend.image.tag -}}
+{{- printf "%s/%s:%s" $registry .Values.frontend.image.repository $tag -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.frontend.image.repository .Values.frontend.image.tag -}}
+{{- printf "%s:%s" .Values.frontend.image.repository $tag -}}
 {{- end -}}
 {{- end -}}
 

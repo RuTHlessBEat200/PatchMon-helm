@@ -6,6 +6,9 @@
 global:
   # Global image registry override
   imageRegistry: ""
+  # Global image tag override for backend and frontend
+  # If set, this overrides backend.image.tag and frontend.image.tag
+  imageTag: ""
   # Global image pull secrets
   imagePullSecrets: []
   # Global storage class
