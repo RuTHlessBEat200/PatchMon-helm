@@ -283,9 +283,9 @@ backend:
     existingSecretClientSecretKey: "oidc-client-secret"
     scopes: "openid profile email"
     buttonText: "Login with SSO"
-    autoCreateUsers: false
+    autoCreateUsers: true
     defaultRole: "user"
-    syncRoles: false
+    syncRoles: true
     disableLocalAuth: false
     sessionTtl: 86400
     # Group mapping for role synchronization
