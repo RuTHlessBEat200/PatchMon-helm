@@ -125,7 +125,9 @@ spec:
       {{- end }}
   {{- if .Values.database.persistence.enabled }}
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: postgres-data
         {{- with .Values.database.persistence.annotations }}
         annotations:

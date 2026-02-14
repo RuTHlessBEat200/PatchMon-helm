@@ -108,7 +108,9 @@ spec:
       {{- end }}
   {{- if .Values.redis.persistence.enabled }}
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: redis-data
         {{- with .Values.redis.persistence.annotations }}
         annotations:
