@@ -329,6 +329,7 @@ backend:
   
   # Service configuration
   service:
+    annotations: []
     type: ClusterIP
     port: 3001
   
@@ -372,6 +373,9 @@ backend:
   
   # Affinity
   affinity: {}
+  
+  # Topology spread constraints
+  topologySpreadConstraints: []
 
 # Frontend configuration
 frontend:
@@ -427,6 +431,7 @@ frontend:
   
   # Service configuration
   service:
+    annotations: []
     type: ClusterIP
     port: 3000
   
@@ -463,6 +468,9 @@ frontend:
   
   # Affinity
   affinity: {}
+  
+  # Topology spread constraints
+  topologySpreadConstraints: []
 
 # Ingress configuration
 ingress:

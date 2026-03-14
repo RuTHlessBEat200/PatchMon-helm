@@ -6,9 +6,14 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "patchmon.frontend.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
+  {{- if or .Values.frontend.service.annotations .Values.commonAnnotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- with .Values.frontend.service.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.commonAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   type: {{ .Values.frontend.service.type }}
