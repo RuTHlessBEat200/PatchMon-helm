@@ -283,7 +283,7 @@ Return the OIDC redirect URI based on ingress configuration
 {{- if or (eq $port "80") (eq $port "443") -}}
 {{- printf "%s://%s/api/v1/auth/oidc/callback" $protocol $host -}}
 {{- else -}}
-{{- printf "%s://%s:%s/api/v1/aurh/oidc/callback" $protocol $host $port -}}
+{{- printf "%s://%s:%s/api/v1/auth/oidc/callback" $protocol $host $port -}}
 {{- end -}}
 {{- end -}}
 
