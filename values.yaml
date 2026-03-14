@@ -33,6 +33,9 @@ database:
     tag: "18-alpine"
     pullPolicy: IfNotPresent
   
+  # host: ""
+  # port: 5432
+  
   # Database credentials
   auth:
     database: patchmon_db
@@ -257,6 +260,8 @@ backend:
     agentRateLimitWindowMs: "60000"
     agentRateLimitMax: "1000"
     # Redis configuration
+    # redisHost: ""
+    # redisPort: "6379"
     redisDb: "0"
     # Security
     # Trust proxy headers from ingress controller and internal cluster networks

@@ -153,6 +153,8 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 | `database.enabled` | Enable PostgreSQL deployment | `true` |
 | `database.image.repository` | PostgreSQL image repository | `postgres` |
 | `database.image.tag` | PostgreSQL image tag | `18-alpine` |
+| `database.host` | Database host | `nil` |
+| `database.port` | Database port | `nil` |
 | `database.auth.database` | Database name | `patchmon_db` |
 | `database.auth.username` | Database user | `patchmon_user` |
 | `database.auth.password` | Database password (**must be set or use existingSecret**) | `""` |
