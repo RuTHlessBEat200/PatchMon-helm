@@ -234,10 +234,10 @@ spec:
             - name: OIDC_READONLY_GROUP
               value: {{ .Values.backend.oidc.groups.readonly | quote }}
             {{- end }}
+            {{- end }}
             {{- range .Values.backend.extraEnv }}
             - name: {{ .name }}
               value: {{ .value | quote }}
-            {{- end }}
             {{- end }}
           ports:
             - name: http
