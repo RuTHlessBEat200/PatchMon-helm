@@ -6,8 +6,8 @@
 global:
   # Global image registry override
   imageRegistry: ""
-  # Global image tag override for backend and frontend
-  # If set, this overrides backend.image.tag and frontend.image.tag
+  # Global image tag override for server
+  # If set, this overrides server.image.tag
   imageTag: ""
   # Global image pull secrets
   imagePullSecrets: []
@@ -203,19 +203,19 @@ redis:
   # Affinity
   affinity: {}
 
-# Backend configuration
-backend:
+# Server configuration (serves frontend static files + backend API in a single Go binary)
+server:
   enabled: true
   image:
     registry: "ghcr.io"
-    repository: patchmon/patchmon-backend
-    tag: 1.4.2
+    repository: patchmon/patchmon-server
+    tag: 2.0.0
     pullPolicy: IfNotPresent
   
   # Deployment configuration
-  replicaCount: 1 # More than 1 requires a shared file storage for agent files (RWX)
+  replicaCount: 1
   updateStrategy:
-    type: Recreate
+    type: RollingUpdate
   
   # Resource limits
   resources:
@@ -228,7 +228,7 @@ backend:
   
   # Horizontal Pod Autoscaler
   autoscaling:
-    enabled: false # Requires RWX storage for agent files if replicaCount > 1
+    enabled: false
     minReplicas: 1
     maxReplicas: 10
     targetCPUUtilizationPercentage: 80
@@ -276,7 +276,6 @@ backend:
   existingSecretJwtKey: "jwt-secret"
   
   aiEncryptionKey: ""
-  existingSecret: ""
   existingSecretAiEncryptionKey: "ai-encryption-key"
   
   # OIDC configuration
@@ -302,41 +301,34 @@ backend:
       user: ""
       readonly: ""
   
-  # Agent files persistence
-  persistence:
-    enabled: true
-    storageClass: ""  # Uses global.storageClass if empty
-    accessModes:
-      - ReadWriteOnce
-    size: 5Gi
-    annotations: {}
-  
   # Probes configuration
   livenessProbe:
     enabled: true
-    httpGet:
-      path: /health
-      port: 3001
-    initialDelaySeconds: 30
+    tcpSocket:
+      port: 3000
+    initialDelaySeconds: 5
     periodSeconds: 10
     timeoutSeconds: 5
-    failureThreshold: 3
+    failureThreshold: 10
   
   readinessProbe:
     enabled: true
     httpGet:
       path: /health
-      port: 3001
-    initialDelaySeconds: 10
+      port: 3000
+      httpHeaders:
+        - name: Host
+          value: localhost
+    initialDelaySeconds: 5
     periodSeconds: 5
     timeoutSeconds: 3
-    failureThreshold: 3
+    failureThreshold: 10
   
   # Service configuration
   service:
     annotations: []
     type: ClusterIP
-    port: 3001
+    port: 3000
   
   # Pod annotations
   podAnnotations: {}
@@ -356,7 +348,7 @@ backend:
     capabilities:
       drop:
         - ALL
-    readOnlyRootFilesystem: false
+    readOnlyRootFilesystem: true
     runAsUser: 1000
     runAsGroup: 1000
     runAsNonRoot: true
@@ -367,8 +359,8 @@ backend:
       enabled: true
     waitForRedis:
       enabled: true
-    fixPermissions:
-      enabled: false  # Disabled by default - fsGroup handles permissions. Enable only if needed and cluster allows privileged init containers.
+    waitForGuacd:
+      enabled: true
   
   extraEnv: []
     # - name: NODE_EXTRA_CA_CERTS
@@ -397,19 +389,19 @@ backend:
   # Topology spread constraints
   topologySpreadConstraints: []
 
-# Frontend configuration
-frontend:
+# Guacamole proxy daemon (guacd) configuration
+guacd:
   enabled: true
   image:
-    registry: "ghcr.io"
-    repository: patchmon/patchmon-frontend
-    tag: 1.4.2
+    registry: "docker.io"
+    repository: guacamole/guacd
+    tag: "latest"
     pullPolicy: IfNotPresent
   
   # Deployment configuration
   replicaCount: 1
   updateStrategy:
-    type: Recreate
+    type: RollingUpdate
   
   # Resource limits
   resources:
@@ -418,42 +410,12 @@ frontend:
       memory: 512Mi
     requests:
       cpu: 10m
-      memory: 50Mi
-  
-  # Horizontal Pod Autoscaler
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 10
-    targetCPUUtilizationPercentage: 80
-    targetMemoryUtilizationPercentage: 80
-  
-  # Probes configuration
-  livenessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 3000
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-  
-  readinessProbe:
-    enabled: true
-    httpGet:
-      path: /
-      port: 3000
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 3
+      memory: 32Mi
   
   # Service configuration
   service:
-    annotations: []
     type: ClusterIP
-    port: 3000
+    port: 4822
   
   # Pod annotations
   podAnnotations: {}
@@ -461,9 +423,9 @@ frontend:
   # Pod security context
   podSecurityContext:
     runAsNonRoot: true
-    runAsUser: 101
-    runAsGroup: 101
-    fsGroup: 101
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
   
@@ -473,12 +435,22 @@ frontend:
     capabilities:
       drop:
         - ALL
-    readOnlyRootFilesystem: false
+    readOnlyRootFilesystem: true
   
-  # Init containers
-  initContainers:
-    waitForBackend:
-      enabled: true
+  # Probes configuration
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
   
   # Node selector
   nodeSelector: {}
@@ -488,9 +460,6 @@ frontend:
   
   # Affinity
   affinity: {}
-  
-  # Topology spread constraints
-  topologySpreadConstraints: []
 
 # Ingress configuration
 ingress:
@@ -504,20 +473,15 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
     nginx.ingress.kubernetes.io/client-body-buffer-size: "4m"
-    nginx.ingress.kubernetes.io/websocket-services: "backend"
+    nginx.ingress.kubernetes.io/websocket-services: "server"
   hosts:
     - host: patchmon.example.com
       paths:
         - path: /
           pathType: Prefix
           service:
-            name: frontend
+            name: server
             port: 3000
-        - path: /api
-          pathType: Prefix
-          service:
-            name: backend
-            port: 3001
   # tls:
   #   - secretName: patchmon-tls
   #     hosts:

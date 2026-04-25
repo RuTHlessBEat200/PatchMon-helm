@@ -86,37 +86,20 @@ app: {{ include "patchmon.fullname" . }}-redis
 {{- end }}
 
 {{/*
-Component labels for backend
+Component labels for server
 */}}
-{{- define "patchmon.backend.labels" -}}
+{{- define "patchmon.server.labels" -}}
 {{ include "patchmon.labels" . }}
-app.kubernetes.io/component: backend
+app.kubernetes.io/component: server
 {{- end }}
 
 {{/*
-Selector labels for backend
+Selector labels for server
 */}}
-{{- define "patchmon.backend.selectorLabels" -}}
+{{- define "patchmon.server.selectorLabels" -}}
 {{ include "patchmon.selectorLabels" . }}
-app.kubernetes.io/component: backend
-app: {{ include "patchmon.fullname" . }}-backend
-{{- end }}
-
-{{/*
-Component labels for frontend
-*/}}
-{{- define "patchmon.frontend.labels" -}}
-{{ include "patchmon.labels" . }}
-app.kubernetes.io/component: frontend
-{{- end }}
-
-{{/*
-Selector labels for frontend
-*/}}
-{{- define "patchmon.frontend.selectorLabels" -}}
-{{ include "patchmon.selectorLabels" . }}
-app.kubernetes.io/component: frontend
-app: {{ include "patchmon.fullname" . }}-frontend
+app.kubernetes.io/component: server
+app: {{ include "patchmon.fullname" . }}-server
 {{- end }}
 
 {{/*
@@ -166,36 +149,49 @@ Return the proper redis image name
 {{- end -}}
 
 {{/*
-Return the proper backend image name
+Return the proper server image name
 */}}
-{{- define "patchmon.backend.image" -}}
-{{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.backend.image.registry "global" .Values.global) -}}
-{{- $tag := .Values.backend.image.tag -}}
+{{- define "patchmon.server.image" -}}
+{{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.server.image.registry "global" .Values.global) -}}
+{{- $tag := .Values.server.image.tag -}}
 {{- if .Values.global.imageTag -}}
 {{- $tag = .Values.global.imageTag -}}
 {{- end -}}
 {{- if $registry -}}
-{{- printf "%s/%s:%s" $registry .Values.backend.image.repository $tag -}}
+{{- printf "%s/%s:%s" $registry .Values.server.image.repository $tag -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.backend.image.repository $tag -}}
+{{- printf "%s:%s" .Values.server.image.repository $tag -}}
 {{- end -}}
 {{- end -}}
 
 {{/*
-Return the proper frontend image name
+Return the proper guacd image name
 */}}
-{{- define "patchmon.frontend.image" -}}
-{{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.frontend.image.registry "global" .Values.global) -}}
-{{- $tag := .Values.frontend.image.tag -}}
-{{- if .Values.global.imageTag -}}
-{{- $tag = .Values.global.imageTag -}}
-{{- end -}}
+{{- define "patchmon.guacd.image" -}}
+{{- $registry := include "patchmon.imageRegistry" (dict "registry" .Values.guacd.image.registry "global" .Values.global) -}}
 {{- if $registry -}}
-{{- printf "%s/%s:%s" $registry .Values.frontend.image.repository $tag -}}
+{{- printf "%s/%s:%s" $registry .Values.guacd.image.repository .Values.guacd.image.tag -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.frontend.image.repository $tag -}}
+{{- printf "%s:%s" .Values.guacd.image.repository .Values.guacd.image.tag -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Component labels for guacd
+*/}}
+{{- define "patchmon.guacd.labels" -}}
+{{ include "patchmon.labels" . }}
+app.kubernetes.io/component: guacd
+{{- end }}
+
+{{/*
+Selector labels for guacd
+*/}}
+{{- define "patchmon.guacd.selectorLabels" -}}
+{{ include "patchmon.selectorLabels" . }}
+app.kubernetes.io/component: guacd
+app: {{ include "patchmon.fullname" . }}-guacd
+{{- end }}
 
 {{/*
 Return the proper storage class
@@ -235,11 +231,11 @@ Return the secret name for redis password
 {{- end -}}
 
 {{/*
-Return the secret name for JWT secret
+Return the secret name for server JWT/AI secrets
 */}}
-{{- define "patchmon.backend.secretName" -}}
-{{- if .Values.backend.existingSecret -}}
-{{- .Values.backend.existingSecret -}}
+{{- define "patchmon.server.secretName" -}}
+{{- if .Values.server.existingSecret -}}
+{{- .Values.server.existingSecret -}}
 {{- else -}}
 {{- include "patchmon.fullname" . -}}-secrets
 {{- end -}}
@@ -277,9 +273,9 @@ docker.io/busybox:latest
 Return the OIDC redirect URI based on ingress configuration
 */}}
 {{- define "patchmon.oidc.redirectUri" -}}
-{{- $host := .Values.backend.env.serverHost -}}
-{{- $protocol := .Values.backend.env.serverProtocol | default "http" -}}
-{{- $port := .Values.backend.env.serverPort | default "80" -}}
+{{- $host := .Values.server.env.serverHost -}}
+{{- $protocol := .Values.server.env.serverProtocol | default "http" -}}
+{{- $port := .Values.server.env.serverPort | default "80" -}}
 {{- if or (eq $port "80") (eq $port "443") -}}
 {{- printf "%s://%s/api/v1/auth/oidc/callback" $protocol $host -}}
 {{- else -}}
@@ -291,9 +287,9 @@ Return the OIDC redirect URI based on ingress configuration
 Return the OIDC post logout URI based on ingress configuration
 */}}
 {{- define "patchmon.oidc.postLogoutUri" -}}
-{{- $host := .Values.backend.env.serverHost -}}
-{{- $protocol := .Values.backend.env.serverProtocol | default "http" -}}
-{{- $port := .Values.backend.env.serverPort | default "80" -}}
+{{- $host := .Values.server.env.serverHost -}}
+{{- $protocol := .Values.server.env.serverProtocol | default "http" -}}
+{{- $port := .Values.server.env.serverPort | default "80" -}}
 {{- if or (eq $port "80") (eq $port "443") -}}
 {{- printf "%s://%s" $protocol $host -}}
 {{- else -}}
