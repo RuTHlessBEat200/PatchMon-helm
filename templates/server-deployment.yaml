@@ -1,35 +1,36 @@
-{{- if .Values.backend.enabled -}}
+{{- if .Values.server.enabled -}}
 {{- $databaseHost := .Values.database.host | default (print (include "patchmon.fullname" .) "-database") }}
 {{- $databasePort := .Values.database.port | default .Values.database.service.port }}
-{{- $redisHost := .Values.backend.env.redisHost | default (print (include "patchmon.fullname" .) "-redis") }}
-{{- $redisPort := .Values.backend.env.redisPort | default .Values.redis.service.port }}
+{{- $redisHost := .Values.server.env.redisHost | default (print (include "patchmon.fullname" .) "-redis") }}
+{{- $redisPort := .Values.server.env.redisPort | default .Values.redis.service.port }}
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: {{ include "patchmon.fullname" . }}-backend
+  name: {{ include "patchmon.fullname" . }}-server
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "patchmon.backend.labels" . | nindent 4 }}
+    {{- include "patchmon.server.labels" . | nindent 4 }}
   {{- with .Values.commonAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if not .Values.backend.autoscaling.enabled }}
-  replicas: {{ .Values.backend.replicaCount }}
+  serviceName: {{ include "patchmon.fullname" . }}-server
+  {{- if not .Values.server.autoscaling.enabled }}
+  replicas: {{ .Values.server.replicaCount }}
   {{- end }}
-  {{- if .Values.backend.updateStrategy }}
-  strategy:
-    {{- toYaml .Values.backend.updateStrategy | nindent 4 }}
+  {{- if .Values.server.updateStrategy }}
+  updateStrategy:
+    {{- toYaml .Values.server.updateStrategy | nindent 4 }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "patchmon.backend.selectorLabels" . | nindent 6 }}
+      {{- include "patchmon.server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "patchmon.backend.selectorLabels" . | nindent 8 }}
-      {{- with .Values.backend.podAnnotations }}
+        {{- include "patchmon.server.selectorLabels" . | nindent 8 }}
+      {{- with .Values.server.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -38,12 +39,12 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.backend.podSecurityContext }}
+      {{- with .Values.server.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
-        {{- if and .Values.backend.initContainers.waitForDatabase.enabled .Values.database.enabled }}
+        {{- if and .Values.server.initContainers.waitForDatabase.enabled .Values.database.enabled }}
         - name: wait-for-database
           image: {{ include "patchmon.initContainer.image" . }}
           command:
@@ -58,7 +59,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 65534
         {{- end }}
-        {{- if and .Values.backend.initContainers.waitForRedis.enabled .Values.redis.enabled }}
+        {{- if and .Values.server.initContainers.waitForRedis.enabled .Values.redis.enabled }}
         - name: wait-for-redis
           image: {{ include "patchmon.initContainer.image" . }}
           command:
@@ -73,37 +74,33 @@ spec:
             runAsNonRoot: true
             runAsUser: 65534
         {{- end }}
-        {{- if .Values.backend.initContainers.fixPermissions.enabled }}
-        - name: fix-permissions
+        {{- if and .Values.server.initContainers.waitForGuacd.enabled .Values.guacd.enabled }}
+        {{- $guacdHost := print (include "patchmon.fullname" .) "-guacd" }}
+        - name: wait-for-guacd
           image: {{ include "patchmon.initContainer.image" . }}
           command:
             - sh
             - "-c"
-            - "chown -R 1000:1000 /app/agents"
-          volumeMounts:
-            - name: agent-files
-              mountPath: /app/agents
+            - "until nc -z {{ $guacdHost }} {{ .Values.guacd.service.port }}; do echo waiting for guacd; sleep 2; done"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
-              add:
-                - CHOWN
-            runAsNonRoot: false
-            runAsUser: 0
+            runAsNonRoot: true
+            runAsUser: 65534
         {{- end }}
       containers:
-        - name: backend
-          image: {{ include "patchmon.backend.image" . }}
-          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        - name: server
+          image: {{ include "patchmon.server.image" . }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
           env:
             - name: ENABLE_LOGGING
-              value: {{ .Values.backend.env.enableLogging | quote }}
+              value: {{ .Values.server.env.enableLogging | quote }}
             - name: LOG_LEVEL
-              value: {{ .Values.backend.env.logLevel | quote }}
+              value: {{ .Values.server.env.logLevel | quote }}
             - name: PM_LOG_TO_CONSOLE
-              value: {{ .Values.backend.env.logToConsole | quote }}
+              value: {{ .Values.server.env.logToConsole | quote }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -114,8 +111,8 @@ spec:
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "patchmon.backend.secretName" . }}
-                  key: {{ .Values.backend.existingSecretJwtKey }}
+                  name: {{ include "patchmon.server.secretName" . }}
+                  key: {{ .Values.server.existingSecretJwtKey }}
             - name: SERVER_PROTOCOL
               valueFrom:
                 configMapKeyRef:
@@ -137,27 +134,27 @@ spec:
                   name: {{ include "patchmon.configMapName" . }}
                   key: CORS_ORIGIN
             - name: DB_CONNECTION_LIMIT
-              value: {{ .Values.backend.env.dbConnectionLimit | quote }}
+              value: {{ .Values.server.env.dbConnectionLimit | quote }}
             - name: DB_POOL_TIMEOUT
-              value: {{ .Values.backend.env.dbPoolTimeout | quote }}
+              value: {{ .Values.server.env.dbPoolTimeout | quote }}
             - name: DB_CONNECT_TIMEOUT
-              value: {{ .Values.backend.env.dbConnectTimeout | quote }}
+              value: {{ .Values.server.env.dbConnectTimeout | quote }}
             - name: DB_IDLE_TIMEOUT
-              value: {{ .Values.backend.env.dbIdleTimeout | quote }}
+              value: {{ .Values.server.env.dbIdleTimeout | quote }}
             - name: DB_MAX_LIFETIME
-              value: {{ .Values.backend.env.dbMaxLifetime | quote }}
+              value: {{ .Values.server.env.dbMaxLifetime | quote }}
             - name: RATE_LIMIT_WINDOW_MS
-              value: {{ .Values.backend.env.rateLimitWindowMs | quote }}
+              value: {{ .Values.server.env.rateLimitWindowMs | quote }}
             - name: RATE_LIMIT_MAX
-              value: {{ .Values.backend.env.rateLimitMax | quote }}
+              value: {{ .Values.server.env.rateLimitMax | quote }}
             - name: AUTH_RATE_LIMIT_WINDOW_MS
-              value: {{ .Values.backend.env.authRateLimitWindowMs | quote }}
+              value: {{ .Values.server.env.authRateLimitWindowMs | quote }}
             - name: AUTH_RATE_LIMIT_MAX
-              value: {{ .Values.backend.env.authRateLimitMax | quote }}
+              value: {{ .Values.server.env.authRateLimitMax | quote }}
             - name: AGENT_RATE_LIMIT_WINDOW_MS
-              value: {{ .Values.backend.env.agentRateLimitWindowMs | quote }}
+              value: {{ .Values.server.env.agentRateLimitWindowMs | quote }}
             - name: AGENT_RATE_LIMIT_MAX
-              value: {{ .Values.backend.env.agentRateLimitMax | quote }}
+              value: {{ .Values.server.env.agentRateLimitMax | quote }}
             - name: REDIS_HOST
               value: {{ $redisHost | quote }}
             - name: REDIS_PORT
@@ -168,113 +165,130 @@ spec:
                   name: {{ include "patchmon.redis.secretName" . }}
                   key: {{ .Values.redis.auth.existingSecretPasswordKey }}
             - name: REDIS_DB
-              value: {{ .Values.backend.env.redisDb | quote }}
+              value: {{ .Values.server.env.redisDb | quote }}
             - name: TRUST_PROXY
-              value: {{ .Values.backend.env.trustProxy | quote }}
+              value: {{ .Values.server.env.trustProxy | quote }}
             - name: ENABLE_HSTS
-              value: {{ .Values.backend.env.enableHsts | quote }}
+              value: {{ .Values.server.env.enableHsts | quote }}
             - name: DEFAULT_USER_ROLE
-              value: {{ .Values.backend.env.defaultUserRole | quote }}
+              value: {{ .Values.server.env.defaultUserRole | quote }}
             - name: AUTO_CREATE_ROLE_PERMISSIONS
-              value: {{ .Values.backend.env.autoCreateRolePermissions | quote }}
+              value: {{ .Values.server.env.autoCreateRolePermissions | quote }}
             - name: AI_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "patchmon.backend.secretName" . }}
-                  key: {{ .Values.backend.existingSecretAiEncryptionKey }}
+                  name: {{ include "patchmon.server.secretName" . }}
+                  key: {{ .Values.server.existingSecretAiEncryptionKey }}
             - name: FRONTEND_URL
               value: {{ include "patchmon.oidc.postLogoutUri" . | quote }}
-            {{- if .Values.backend.oidc.enabled }}
+            {{- if .Values.server.oidc.enabled }}
             - name: OIDC_ENABLED
-              value: {{ .Values.backend.oidc.enabled | quote }}
+              value: {{ .Values.server.oidc.enabled | quote }}
             - name: OIDC_ISSUER_URL
-              value: {{ .Values.backend.oidc.issuerUrl | quote }}
+              value: {{ .Values.server.oidc.issuerUrl | quote }}
             - name: OIDC_CLIENT_ID
-              value: {{ .Values.backend.oidc.clientId | quote }}
+              value: {{ .Values.server.oidc.clientId | quote }}
             - name: OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "patchmon.backend.secretName" . }}
-                  key: {{ .Values.backend.oidc.existingSecretClientSecretKey }}
+                  name: {{ include "patchmon.server.secretName" . }}
+                  key: {{ .Values.server.oidc.existingSecretClientSecretKey }}
             - name: OIDC_REDIRECT_URI
               value: {{ include "patchmon.oidc.redirectUri" . | quote }}
             - name: OIDC_POST_LOGOUT_URI
               value: {{ include "patchmon.oidc.postLogoutUri" . | quote }}
             - name: OIDC_SCOPES
-              value: {{ .Values.backend.oidc.scopes | quote }}
+              value: {{ .Values.server.oidc.scopes | quote }}
             - name: OIDC_BUTTON_TEXT
-              value: {{ .Values.backend.oidc.buttonText | quote }}
+              value: {{ .Values.server.oidc.buttonText | quote }}
             - name: OIDC_AUTO_CREATE_USERS
-              value: {{ .Values.backend.oidc.autoCreateUsers | quote }}
+              value: {{ .Values.server.oidc.autoCreateUsers | quote }}
             - name: OIDC_DEFAULT_ROLE
-              value: {{ .Values.backend.oidc.defaultRole | quote }}
+              value: {{ .Values.server.oidc.defaultRole | quote }}
             - name: OIDC_SYNC_ROLES
-              value: {{ .Values.backend.oidc.syncRoles | quote }}
+              value: {{ .Values.server.oidc.syncRoles | quote }}
             - name: OIDC_DISABLE_LOCAL_AUTH
-              value: {{ .Values.backend.oidc.disableLocalAuth | quote }}
+              value: {{ .Values.server.oidc.disableLocalAuth | quote }}
             - name: OIDC_SESSION_TTL
-              value: {{ .Values.backend.oidc.sessionTtl | quote }}
-            {{- if .Values.backend.oidc.groups.superadmin }}
+              value: {{ .Values.server.oidc.sessionTtl | quote }}
+            {{- if .Values.server.oidc.groups.superadmin }}
             - name: OIDC_SUPERADMIN_GROUP
-              value: {{ .Values.backend.oidc.groups.superadmin | quote }}
+              value: {{ .Values.server.oidc.groups.superadmin | quote }}
             {{- end }}
-            {{- if .Values.backend.oidc.groups.admin }}
+            {{- if .Values.server.oidc.groups.admin }}
             - name: OIDC_ADMIN_GROUP
-              value: {{ .Values.backend.oidc.groups.admin | quote }}
+              value: {{ .Values.server.oidc.groups.admin | quote }}
             {{- end }}
-            {{- if .Values.backend.oidc.groups.hostManager }}
+            {{- if .Values.server.oidc.groups.hostManager }}
             - name: OIDC_HOST_MANAGER_GROUP
-              value: {{ .Values.backend.oidc.groups.hostManager | quote }}
+              value: {{ .Values.server.oidc.groups.hostManager | quote }}
             {{- end }}
-            {{- if .Values.backend.oidc.groups.user }}
+            {{- if .Values.server.oidc.groups.user }}
             - name: OIDC_USER_GROUP
-              value: {{ .Values.backend.oidc.groups.user | quote }}
+              value: {{ .Values.server.oidc.groups.user | quote }}
             {{- end }}
-            {{- if .Values.backend.oidc.groups.readonly }}
+            {{- if .Values.server.oidc.groups.readonly }}
             - name: OIDC_READONLY_GROUP
-              value: {{ .Values.backend.oidc.groups.readonly | quote }}
+              value: {{ .Values.server.oidc.groups.readonly | quote }}
             {{- end }}
             {{- end }}
-            {{- range .Values.backend.extraEnv }}
+            {{- range .Values.server.extraEnv }}
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
           ports:
             - name: http
-              containerPort: 3001
+              containerPort: {{ .Values.server.service.port }}
               protocol: TCP
-          {{- if .Values.backend.livenessProbe.enabled }}
+          {{- if .Values.server.livenessProbe.enabled }}
           livenessProbe:
+            {{- if .Values.server.livenessProbe.tcpSocket }}
+            tcpSocket:
+              port: {{ .Values.server.livenessProbe.tcpSocket.port }}
+            {{- else }}
             httpGet:
-              path: {{ .Values.backend.livenessProbe.httpGet.path }}
-              port: {{ .Values.backend.livenessProbe.httpGet.port }}
-            initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
-            timeoutSeconds: {{ .Values.backend.livenessProbe.timeoutSeconds }}
-            failureThreshold: {{ .Values.backend.livenessProbe.failureThreshold }}
+              path: {{ .Values.server.livenessProbe.httpGet.path }}
+              port: {{ .Values.server.livenessProbe.httpGet.port }}
+              {{- with .Values.server.livenessProbe.httpGet.httpHeaders }}
+              httpHeaders:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.server.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.livenessProbe.failureThreshold }}
           {{- end }}
-          {{- if .Values.backend.readinessProbe.enabled }}
+          {{- if .Values.server.readinessProbe.enabled }}
           readinessProbe:
+            {{- if .Values.server.readinessProbe.tcpSocket }}
+            tcpSocket:
+              port: {{ .Values.server.readinessProbe.tcpSocket.port }}
+            {{- else }}
             httpGet:
-              path: {{ .Values.backend.readinessProbe.httpGet.path }}
-              port: {{ .Values.backend.readinessProbe.httpGet.port }}
-            initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}
-            timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
-            failureThreshold: {{ .Values.backend.readinessProbe.failureThreshold }}
+              path: {{ .Values.server.readinessProbe.httpGet.path }}
+              port: {{ .Values.server.readinessProbe.httpGet.port }}
+              {{- with .Values.server.readinessProbe.httpGet.httpHeaders }}
+              httpHeaders:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.server.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.readinessProbe.failureThreshold }}
           {{- end }}
-          {{- with .Values.backend.resources }}
+          {{- with .Values.server.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.backend.securityContext }}
+          {{- with .Values.server.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.server.extraVolumeMounts }}
           volumeMounts:
-            - name: agent-files
-              mountPath: /app/agents
-            {{- range .Values.backend.extraVolumeMounts }}
+            {{- range .Values.server.extraVolumeMounts }}
             - name: {{ .name }}
               mountPath: {{ .mountPath }}
               {{- if .subPath }}
@@ -286,11 +300,10 @@ spec:
               readOnly: true
               {{- end }}
             {{- end }}
+          {{- end }}
+      {{- if .Values.server.extraVolumes }}
       volumes:
-        - name: agent-files
-          persistentVolumeClaim:
-            claimName: {{ include "patchmon.fullname" . }}-agent-files
-        {{- range .Values.backend.extraVolumes }}
+        {{- range .Values.server.extraVolumes }}
         - name: {{ .name }}
           {{- if .configMap }}
           configMap:
@@ -301,19 +314,20 @@ spec:
             secretName: {{ .secret.secretName }}
           {{- end }}
         {{- end }}
-      {{- with .Values.backend.nodeSelector }}
+      {{- end }}
+      {{- with .Values.server.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.backend.affinity }}
+      {{- with .Values.server.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.backend.tolerations }}
+      {{- with .Values.server.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.backend.topologySpreadConstraints }}
+      {{- with .Values.server.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}

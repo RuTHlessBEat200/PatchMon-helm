@@ -2,18 +2,60 @@
 
 A production-ready Helm chart for deploying PatchMon, a comprehensive Linux patch monitoring and management system.
 
+## Upgrading from v1 to v2
+
+> **This is not a drop-in upgrade.** PatchMon v2 is a major release with significant architectural changes. Simply bumping the chart version will break your deployment. Read this section carefully before proceeding.
+>
+> More information at: https://docs.patchmon.net/books/patchmon-application-documentation/page/migrating-from-142-to-200
+
+**What changed in v2:**
+
+- The separate `backend` and `frontend` containers have been merged into a single `server` container. The frontend static files are now embedded in the Go binary and served directly by the server.
+- Agent binaries are now embedded in the container image — the agent files PVC is no longer needed.
+- Branding assets are now stored in the database — the assets volume is no longer needed.
+- The chart values structure has changed: all `backend:` and `frontend:` keys are replaced by a single `server:` key.
+- The server runs on port `3000` (previously backend on `3001`, frontend on `3000`).
+- Guacamole daemon (`guacd`) is now a required dependency, deployed as a separate pod.
+
+**Migration steps:**
+
+1. Review `values.yaml` or `values-prod.yaml` in this chart for the new configuration structure before making any changes.
+
+2. Update your values overrides — rename `backend:` to `server:` and remove any `frontend:` block entirely. The ingress no longer needs separate `/` and `/api` paths; everything routes to `server` on port `3000`.
+
+3. Delete the old Deployment resources (Kubernetes does not allow changing a resource kind in-place):
+   ```bash
+   kubectl delete deployment <release>-backend <release>-frontend -n <namespace>
+   ```
+
+4. Delete the old agent files PVC if present (no longer used):
+   ```bash
+   kubectl delete pvc <release>-agent-files -n <namespace>
+   ```
+
+5. Run `helm upgrade`.
+
+Refer to [values-prod.yaml](values-prod.yaml) for a complete working example of the v2 values structure.
+
+---
+
+> **Important: Keep `server.replicaCount` at `1`.**
+> Agents establish persistent connections to a specific server pod. With multiple replicas, an agent may connect to pod A while the ingress routes your browser session to pod B — causing agents to appear offline even though they are actively connected. Until a shared connection state backend is implemented, horizontal scaling of the server is not supported. This issue is not related to the Helm chart but to the PatchMon application itself.
+
+
+
 ## Features
 
-- 🚀 **Complete Stack Deployment**: PostgreSQL 18-alpine, Redis 8-alpine, Backend API, and Frontend UI
-- 🔧 **Highly Configurable**: Extensive values.yaml with sensible defaults
-- 🔐 **Security First**: Non-root containers, user-provided secrets, seccomp profiles, minimal capabilities
-- 📈 **Auto-scaling**: HPA support for backend and frontend
-- 🏷️ **Flexible Naming**: Global name overrides for multi-tenant deployments
-- 💾 **Persistent Storage**: Configurable storage classes and sizes
-- 🔄 **Dependency Management**: Built-in init containers for service dependencies with security contexts
-- 🌐 **Ingress Support**: TLS and cert-manager integration
-- 📊 **Resource Management**: Configurable resource limits and requests
-- ⚡ **Production Ready**: Complies with Kubernetes restricted PodSecurity policy
+- Complete Stack Deployment: PostgreSQL 18-alpine, Redis 8-alpine, PatchMon Server, and Guacamole daemon (guacd)
+- Highly Configurable: Extensive values.yaml with sensible defaults
+- Security First: Non-root containers, user-provided secrets, seccomp profiles, minimal capabilities
+- Auto-scaling: HPA support for server (not recommended, see note above)
+- Flexible Naming: Global name overrides for multi-tenant deployments
+- Persistent Storage: Configurable storage classes and sizes
+- Dependency Management: Built-in init containers for service dependencies with security contexts
+- Ingress Support: TLS and cert-manager integration
+- Resource Management: Configurable resource limits and requests
+- Production Ready: Complies with Kubernetes restricted PodSecurity policy
 
 ## Prerequisites
 
@@ -41,7 +83,7 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 
 # Or install a specific version
 helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
-  --version 1.1.0 \
+  --version 2.0.0 \
   --namespace patchmon \
   --create-namespace
 
@@ -53,7 +95,6 @@ helm install patchmon ./patchmon -n patchmon --create-namespace -f custom-values
 **Note**: Browse available versions at https://github.com/RuTHlessBEat200/PatchMon-helm/releases
 
 ### Production Deployment
-
 
 **Secret Management Best Practices:**
 
@@ -67,7 +108,6 @@ The chart supports integration with secure secret management tools:
 **Production example** ([values-prod.yaml](values-prod.yaml)):
 
 ```yaml
-# Examplary values for production deployment of PatchMon with a RWO storage class and ingress
 global:
   storageClass: "proxmox-data"
 
@@ -75,7 +115,7 @@ fullnameOverride: "patchmon-prod"
 
 # Use KSOPS to manage secrets in production or other secure methods
 
-backend:
+server:
   env:
     serverProtocol: https
     serverHost: patchmon.example.com
@@ -112,13 +152,8 @@ ingress:
         - path: /
           pathType: Prefix
           service:
-            name: frontend
+            name: server
             port: 3000
-        - path: /api
-          pathType: Prefix
-          service:
-            name: backend
-            port: 3001
   tls:
     - secretName: patchmon-tls
       hosts:
@@ -153,8 +188,8 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 | `database.enabled` | Enable PostgreSQL deployment | `true` |
 | `database.image.repository` | PostgreSQL image repository | `postgres` |
 | `database.image.tag` | PostgreSQL image tag | `18-alpine` |
-| `database.host` | Database host | `nil` |
-| `database.port` | Database port | `nil` |
+| `database.host` | External database host (disables internal deployment) | `nil` |
+| `database.port` | External database port | `nil` |
 | `database.auth.database` | Database name | `patchmon_db` |
 | `database.auth.username` | Database user | `patchmon_user` |
 | `database.auth.password` | Database password (**must be set or use existingSecret**) | `""` |
@@ -178,49 +213,45 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 | `redis.resources.requests.memory` | Memory request | `10Mi` |
 | `redis.resources.limits.memory` | Memory limit | `512Mi` |
 
-### Backend Configuration
+### Server Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `backend.enabled` | Enable backend deployment | `true` |
-| `backend.image.registry` | Backend image registry | `ghcr.io` |
-| `backend.image.repository` | Backend image repository | `patchmon/patchmon-backend` |
-| `backend.image.tag` | Backend image tag | `1.4.2` |
-| `backend.replicaCount` | Number of backend replicas | `1` (>1 requires RWX storage) |
-| `backend.jwtSecret` | JWT secret (**must be set or use existingSecret**) | `""` |
-| `backend.env.serverProtocol` | Server protocol | `http` |
-| `backend.env.serverHost` | Server hostname | `patchmon.example.com` |
-| `backend.env.serverPort` | Server port | `80` |
-| `backend.env.corsOrigin` | CORS origin URL | `http://patchmon.example.com` |
-| `backend.persistence.size` | Agent files PVC size | `5Gi` |
-| `backend.autoscaling.enabled` | Enable HPA for backend | `false` |
-| `backend.autoscaling.minReplicas` | Minimum replicas | `1` |
-| `backend.autoscaling.maxReplicas` | Maximum replicas | `10` |
-| `backend.resources.requests.memory` | Memory request | `256Mi` |
-| `backend.resources.limits.memory` | Memory limit | `2Gi` |
+| `server.enabled` | Enable server deployment | `true` |
+| `server.image.registry` | Server image registry | `ghcr.io` |
+| `server.image.repository` | Server image repository | `patchmon/patchmon-server` |
+| `server.image.tag` | Server image tag | `2.0.0` |
+| `server.replicaCount` | Number of server replicas (**keep at 1**, see note at top) | `1` |
+| `server.jwtSecret` | JWT secret (**must be set or use existingSecret**) | `""` |
+| `server.aiEncryptionKey` | AI encryption key (**must be set or use existingSecret**) | `""` |
+| `server.env.serverProtocol` | Server protocol | `http` |
+| `server.env.serverHost` | Server hostname | `patchmon.example.com` |
+| `server.env.serverPort` | Server port | `80` |
+| `server.env.corsOrigin` | CORS origin URL | `http://patchmon.example.com` |
+| `server.autoscaling.enabled` | Enable HPA (not recommended, see note at top) | `false` |
+| `server.autoscaling.minReplicas` | Minimum replicas | `1` |
+| `server.autoscaling.maxReplicas` | Maximum replicas | `10` |
+| `server.resources.requests.memory` | Memory request | `256Mi` |
+| `server.resources.limits.memory` | Memory limit | `2Gi` |
 
-### Frontend Configuration
+### Guacd Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `frontend.enabled` | Enable frontend deployment | `true` |
-| `frontend.image.registry` | Frontend image registry | `ghcr.io` |
-| `frontend.image.repository` | Frontend image repository | `patchmon/patchmon-frontend` |
-| `frontend.image.tag` | Frontend image tag | `1.4.2` |
-| `frontend.replicaCount` | Number of frontend replicas | `1` |
-| `frontend.autoscaling.enabled` | Enable HPA for frontend | `false` |
-| `frontend.autoscaling.minReplicas` | Minimum replicas | `1` |
-| `frontend.autoscaling.maxReplicas` | Maximum replicas | `10` |
-| `frontend.resources.requests.memory` | Memory request | `50Mi` |
-| `frontend.resources.limits.memory` | Memory limit | `512Mi` |
+| `guacd.enabled` | Enable Guacamole proxy daemon | `true` |
+| `guacd.image.repository` | guacd image repository | `guacamole/guacd` |
+| `guacd.image.tag` | guacd image tag | `latest` |
+| `guacd.service.port` | guacd service port | `4822` |
+| `guacd.resources.requests.memory` | Memory request | `32Mi` |
+| `guacd.resources.limits.memory` | Memory limit | `512Mi` |
 
 ### Ingress Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `ingress.enabled` | Enable ingress | `true` |
-| `ingress.className` | Ingress class name | `""` (empty, uses default) |
-| `ingress.annotations` | Ingress annotations | cert-manager disabled by default |
+| `ingress.className` | Ingress class name | `""` |
+| `ingress.annotations` | Ingress annotations | nginx proxy settings |
 | `ingress.hosts` | Ingress hosts configuration | `patchmon.example.com` |
 | `ingress.tls` | TLS configuration | Commented out by default |
 
@@ -228,12 +259,12 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 
 ### Multi-Tenant Deployment
 
-Deploy multiple instances with name prefixes:
+Deploy multiple instances with name overrides:
 
 ```yaml
 fullnameOverride: "patchmon-tenant1"
 
-backend:
+server:
   env:
     serverHost: tenant1.patchmon.example.com
     corsOrigin: https://tenant1.patchmon.example.com
@@ -256,68 +287,47 @@ global:
 This will override component-specific registries and pull all images from your registry:
 - `registry.example.com/postgres:18-alpine`
 - `registry.example.com/redis:8-alpine`
-- `registry.example.com/patchmon/patchmon-backend:1.4.2`
-- `registry.example.com/patchmon/patchmon-frontend:1.4.2`
+- `registry.example.com/patchmon/patchmon-server:2.0.0`
+- `registry.example.com/guacamole/guacd:latest`
 - `registry.example.com/busybox:latest` (init containers)
 
 Without `global.imageRegistry`, components use their default registries:
 - Database/Redis: `docker.io`
-- Backend/Frontend: `ghcr.io`
+- Server/guacd: `ghcr.io` / `docker.io`
 
 ### External Secrets
 
-Use existing secrets or set secrets directly in values files. Secrets must be set explicitly; auto-generation is not supported:
+Use existing secrets instead of setting values directly:
 
 ```yaml
 database:
   auth:
     existingSecret: "my-db-secret"
     existingSecretPasswordKey: "password"
-    # password: "your-db-password"
 
 redis:
   auth:
     existingSecret: "my-redis-secret"
     existingSecretPasswordKey: "password"
-    # password: "your-redis-password"
 
-backend:
-  existingSecret: "my-backend-secret"
+server:
+  existingSecret: "my-server-secret"
   existingSecretJwtKey: "jwt-secret"
   existingSecretAiEncryptionKey: "ai-encryption-key"
   oidc:
     existingSecretClientSecretKey: "oidc-client-secret"
 ```
 
-### Enable Auto-scaling
-
-```yaml
-backend:
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 20
-    targetCPUUtilizationPercentage: 70
-    targetMemoryUtilizationPercentage: 80
-
-frontend:
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 10
-    targetCPUUtilizationPercentage: 80
-```
-
 ### Disable Components
 
 ```yaml
-# Use external database
+# Use an external database
 database:
   enabled: false
 
-backend:
+server:
   env:
-    # Configure external database connection
+    # Configure external database connection via DATABASE_URL or host/port overrides
 ```
 
 ## Upgrading
@@ -334,7 +344,6 @@ helm upgrade patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
   -f values.yaml \
   --wait --timeout 10m
 ```
-
 
 **Secret Handling on Upgrades:**
 
@@ -365,28 +374,29 @@ kubectl logs <pod-name> -n patchmon
 ```bash
 kubectl logs <pod-name> -n patchmon -c wait-for-database
 kubectl logs <pod-name> -n patchmon -c wait-for-redis
-kubectl logs <pod-name> -n patchmon -c wait-for-backend
+kubectl logs <pod-name> -n patchmon -c wait-for-guacd
 ```
 
 ### Check Service Connectivity
 
 ```bash
 # Test database connection
-kubectl exec -n patchmon -it deployment/patchmon-backend -- nc -zv patchmon-database 5432
+kubectl exec -n patchmon -it statefulset/patchmon-server -- nc -zv patchmon-database 5432
 
 # Test Redis connection
-kubectl exec -n patchmon -it deployment/patchmon-backend -- nc -zv patchmon-redis 6379
+kubectl exec -n patchmon -it statefulset/patchmon-server -- nc -zv patchmon-redis 6379
 
-# Check backend health
-kubectl exec -n patchmon -it deployment/patchmon-backend -- wget -qO- http://localhost:3001/health
+# Check server health
+kubectl exec -n patchmon -it statefulset/patchmon-server -- wget -qO- http://localhost:3000/health
 ```
 
 ### Common Issues
 
-1. **Pods stuck in Init state**: Check if database/redis services are running
+1. **Pods stuck in Init state**: Check if database, redis, and guacd services are running
 2. **PVC binding issues**: Verify storage class is available: `kubectl get sc`
-3. **Image pull errors**: Check image registry credentials and imagePullSecrets
+3. **Image pull errors**: Check image registry credentials and `imagePullSecrets`
 4. **Ingress not working**: Verify ingress controller is installed and cert-manager is configured
+5. **Agents appear offline**: Ensure `server.replicaCount` is `1` — see the note at the top of this document
 
 ## Development
 
