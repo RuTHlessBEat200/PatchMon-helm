@@ -209,7 +209,7 @@ server:
   image:
     registry: "ghcr.io"
     repository: patchmon/patchmon-server
-    tag: 2.0.0
+    tag: 2.0.1
     pullPolicy: IfNotPresent
   
   # Deployment configuration

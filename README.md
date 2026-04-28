@@ -83,7 +83,7 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 
 # Or install a specific version
 helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
-  --version 2.0.0 \
+  --version 2.1.0 \
   --namespace patchmon \
   --create-namespace
 
@@ -220,7 +220,7 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 | `server.enabled` | Enable server deployment | `true` |
 | `server.image.registry` | Server image registry | `ghcr.io` |
 | `server.image.repository` | Server image repository | `patchmon/patchmon-server` |
-| `server.image.tag` | Server image tag | `2.0.0` |
+| `server.image.tag` | Server image tag | `2.0.1` |
 | `server.replicaCount` | Number of server replicas (**keep at 1**, see note at top) | `1` |
 | `server.jwtSecret` | JWT secret (**must be set or use existingSecret**) | `""` |
 | `server.aiEncryptionKey` | AI encryption key (**must be set or use existingSecret**) | `""` |
@@ -287,7 +287,7 @@ global:
 This will override component-specific registries and pull all images from your registry:
 - `registry.example.com/postgres:18-alpine`
 - `registry.example.com/redis:8-alpine`
-- `registry.example.com/patchmon/patchmon-server:2.0.0`
+- `registry.example.com/patchmon/patchmon-server:2.0.1`
 - `registry.example.com/guacamole/guacd:latest`
 - `registry.example.com/busybox:latest` (init containers)
 

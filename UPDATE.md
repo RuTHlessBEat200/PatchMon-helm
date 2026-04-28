@@ -14,8 +14,8 @@ This guide describes how to update the PatchMon Helm chart when a new version is
 Edit `Chart.yaml` and update the following fields:
 
 ```yaml
-version: 1.0.0        # Increment chart version (see version scheme below)
-appVersion: v1.4.2    # Update to new PatchMon version
+version: 2.1.0        # Increment chart version (see version scheme below)
+appVersion: v2.0.1    # Update to new PatchMon version
 ```
 
 **Chart Version Scheme (Semantic Versioning):**
@@ -48,25 +48,15 @@ The chart version follows `MAJOR.MINOR.PATCH`:
 
 ### 2. Update Image Tags
 
-Edit `values.yaml` and update the image tags for backend and frontend:
+Edit `values.yaml` and update the image tag for server:
 
-#### Backend Image
+#### Server Image
 ```yaml
-backend:
+server:
   image:
     registry: ghcr.io
-    repository: patchmon/patchmon-backend
-    tag: "1.4.2"      # Update this
-    pullPolicy: Always
-```
-
-#### Frontend Image
-```yaml
-frontend:
-  image:
-    registry: ghcr.io
-    repository: patchmon/patchmon-frontend
-    tag: "1.4.2"      # Update this
+    repository: patchmon/patchmon-server
+    tag: "2.0.1"      # Update this
     pullPolicy: IfNotPresent
 ```
 
