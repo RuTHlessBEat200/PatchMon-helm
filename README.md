@@ -40,7 +40,7 @@ Refer to [values-prod.yaml](values-prod.yaml) for a complete working example of 
 ---
 
 > **Important: Keep `server.replicaCount` at `1`.**
-> Agents establish persistent connections to a specific server pod. With multiple replicas, an agent may connect to pod A while the ingress routes your browser session to pod B — causing agents to appear offline even though they are actively connected. Until a shared connection state backend is implemented, horizontal scaling of the server is not supported. This issue is not related to the Helm chart but to the PatchMon application itself.
+> Agents establish persistent connections to a specific server pod. With multiple replicas, an agent may connect to pod A while the ingress routes your browser session to pod B — causing agents to appear offline even though they are actively connected. Until a shared connection state backend is implemented, horizontal scaling of the server is not supported. This issue is not related to the Helm chart but to the PatchMon application itself. This PR will fix it: https://github.com/PatchMon/PatchMon/pull/722
 
 
 
@@ -220,7 +220,7 @@ helm install patchmon oci://ghcr.io/ruthlessbeat200/charts/patchmon \
 | `server.enabled` | Enable server deployment | `true` |
 | `server.image.registry` | Server image registry | `ghcr.io` |
 | `server.image.repository` | Server image repository | `patchmon/patchmon-server` |
-| `server.image.tag` | Server image tag | `2.0.1` |
+| `server.image.tag` | Server image tag | `2.0.2` |
 | `server.replicaCount` | Number of server replicas (**keep at 1**, see note at top) | `1` |
 | `server.jwtSecret` | JWT secret (**must be set or use existingSecret**) | `""` |
 | `server.aiEncryptionKey` | AI encryption key (**must be set or use existingSecret**) | `""` |
@@ -287,7 +287,7 @@ global:
 This will override component-specific registries and pull all images from your registry:
 - `registry.example.com/postgres:18-alpine`
 - `registry.example.com/redis:8-alpine`
-- `registry.example.com/patchmon/patchmon-server:2.0.1`
+- `registry.example.com/patchmon/patchmon-server:2.0.2`
 - `registry.example.com/guacamole/guacd:latest`
 - `registry.example.com/busybox:latest` (init containers)
 

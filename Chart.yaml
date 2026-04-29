@@ -3,7 +3,7 @@ name: patchmon
 description: A Helm chart for PatchMon - Linux Patch Monitoring and Management System
 type: application
 version: 2.1.0
-appVersion: "v2.0.1"
+appVersion: "v2.0.2"
 keywords:
 - patchmon
 - monitoring

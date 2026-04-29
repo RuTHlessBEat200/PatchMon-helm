@@ -15,7 +15,7 @@ Edit `Chart.yaml` and update the following fields:
 
 ```yaml
 version: 2.1.0        # Increment chart version (see version scheme below)
-appVersion: v2.0.1    # Update to new PatchMon version
+appVersion: v2.0.2    # Update to new PatchMon version
 ```
 
 **Chart Version Scheme (Semantic Versioning):**
@@ -56,7 +56,7 @@ server:
   image:
     registry: ghcr.io
     repository: patchmon/patchmon-server
-    tag: "2.0.1"      # Update this
+    tag: "2.0.2"      # Update this
     pullPolicy: IfNotPresent
 ```
 
