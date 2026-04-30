@@ -142,8 +142,8 @@ redis:
       cpu: 500m
       memory: 512Mi
     requests:
-      cpu: 50m
-      memory: 10Mi
+      cpu: 100m
+      memory: 128Mi
   
   # Persistence configuration
   persistence:
