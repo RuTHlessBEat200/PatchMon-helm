@@ -106,6 +106,9 @@ database:
       drop:
         - ALL
     readOnlyRootFilesystem: false
+    runAsUser: 999
+    runAsGroup: 999
+    runAsNonRoot: true
   
   # Node selector
   nodeSelector: {}
@@ -193,6 +196,9 @@ redis:
       drop:
         - ALL
     readOnlyRootFilesystem: false
+    runAsUser: 999
+    runAsGroup: 999
+    runAsNonRoot: true
   
   # Node selector
   nodeSelector: {}
