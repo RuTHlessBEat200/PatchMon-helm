@@ -249,6 +249,27 @@ Return the configmap name
 {{- end -}}
 
 {{/*
+Return the cluster-internal FQDN for the database service
+*/}}
+{{- define "patchmon.database.fqdn" -}}
+{{- printf "%s-database.%s.svc.cluster.local" (include "patchmon.fullname" .) .Release.Namespace -}}
+{{- end -}}
+
+{{/*
+Return the cluster-internal FQDN for the redis service
+*/}}
+{{- define "patchmon.redis.fqdn" -}}
+{{- printf "%s-redis.%s.svc.cluster.local" (include "patchmon.fullname" .) .Release.Namespace -}}
+{{- end -}}
+
+{{/*
+Return the cluster-internal FQDN for the guacd service
+*/}}
+{{- define "patchmon.guacd.fqdn" -}}
+{{- printf "%s-guacd.%s.svc.cluster.local" (include "patchmon.fullname" .) .Release.Namespace -}}
+{{- end -}}
+
+{{/*
 Common annotations
 */}}
 {{- define "patchmon.annotations" -}}

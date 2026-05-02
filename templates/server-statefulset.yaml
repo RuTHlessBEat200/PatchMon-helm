@@ -1,7 +1,7 @@
 {{- if .Values.server.enabled -}}
-{{- $databaseHost := .Values.database.host | default (print (include "patchmon.fullname" .) "-database") }}
+{{- $databaseHost := .Values.database.host | default (include "patchmon.database.fqdn" .) }}
 {{- $databasePort := .Values.database.port | default .Values.database.service.port }}
-{{- $redisHost := .Values.server.env.redisHost | default (print (include "patchmon.fullname" .) "-redis") }}
+{{- $redisHost := .Values.server.env.redisHost | default (include "patchmon.redis.fqdn" .) }}
 {{- $redisPort := .Values.server.env.redisPort | default .Values.redis.service.port }}
 apiVersion: apps/v1
 kind: StatefulSet
@@ -75,7 +75,7 @@ spec:
             runAsUser: 65534
         {{- end }}
         {{- if and .Values.server.initContainers.waitForGuacd.enabled .Values.guacd.enabled }}
-        {{- $guacdHost := print (include "patchmon.fullname" .) "-guacd" }}
+        {{- $guacdHost := include "patchmon.guacd.fqdn" . }}
         - name: wait-for-guacd
           image: {{ include "patchmon.initContainer.image" . }}
           command:
