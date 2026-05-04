@@ -1,3 +1,37 @@
+## Helm Chart Migration to PatchMon
+
+> This Helm chart is being **moved to [PatchMon](https://github.com/PatchMon/PatchMon)** and will **no longer be maintained** here. The chart will remain available as a public archive until December 31, 2026, to give users sufficient time to make the transition.
+> 
+> Migration is straightforward — update your Helm repo URL and chart tag. In the PatchMon Helm chart, the tag matches the PatchMon version, so this chart transitions to **version 2.0.3**.
+
+---
+
+## Pod Security Context — Manual Intervention Required
+
+This final release includes changes to the pod security context (UID/GID adjustments and `fsGroupChangePolicy: OnRootMismatch`). Existing deployments may have filesystem ownership mismatches that prevent the pod from starting correctly.
+
+**To fix, follow these steps:**
+
+1. **Temporarily allow root** by setting `runAsNonRoot: false` in your `values.yaml`
+```yaml
+redis:
+  podSecurityContext:
+    runAsNonRoot: false
+  securityContext:
+    runAsNonRoot: false
+
+database:
+  podSecurityContext:
+    runAsNonRoot: false
+  securityContext:
+    runAsNonRoot: false
+```
+2. Let the pod start — Kubernetes will correct the filesystem ownership via `fsGroup`
+3. Once ownership is fixed, **restore** `runAsNonRoot: true`
+4. Redeploy — the pod should now start cleanly as a non-root user
+
+This is a one-time adjustment for redis and postgres deployment.
+
 # PatchMon Helm Chart
 
 A production-ready Helm chart for deploying PatchMon, a comprehensive Linux patch monitoring and management system.
@@ -323,16 +357,16 @@ kubectl delete pvc -n patchmon -l app.kubernetes.io/instance=patchmon
 
 ```bash
 kubectl get pods -n patchmon
-kubectl describe pod <pod-name> -n patchmon
-kubectl logs <pod-name> -n patchmon
+kubectl describe pod <pod-name-n patchmon
+kubectl logs <pod-name-n patchmon
 ```
 
 ### Check Init Container Logs
 
 ```bash
-kubectl logs <pod-name> -n patchmon -c wait-for-database
-kubectl logs <pod-name> -n patchmon -c wait-for-redis
-kubectl logs <pod-name> -n patchmon -c wait-for-guacd
+kubectl logs <pod-name-n patchmon -c wait-for-database
+kubectl logs <pod-name-n patchmon -c wait-for-redis
+kubectl logs <pod-name-n patchmon -c wait-for-guacd
 ```
 
 ### Check Service Connectivity
