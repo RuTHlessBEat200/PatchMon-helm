@@ -12,25 +12,34 @@ This final release includes changes to the pod security context (UID/GID adjustm
 
 **To fix, follow these steps:**
 
-1. **Temporarily allow root** by setting `runAsNonRoot: false` in your `values.yaml`
+1. **Temporarily enable `fixPermissions`** in your `values.yaml` (or override file):
 ```yaml
 redis:
-  podSecurityContext:
-    runAsNonRoot: false
-  securityContext:
-    runAsNonRoot: false
+  initContainers:
+    fixPermissions:
+      enabled: true
 
 database:
-  podSecurityContext:
-    runAsNonRoot: false
-  securityContext:
-    runAsNonRoot: false
+  initContainers:
+    fixPermissions:
+      enabled: true
 ```
-2. Let the pod start — Kubernetes will correct the filesystem ownership via `fsGroup`
-3. Once ownership is fixed, **restore** `runAsNonRoot: true`
-4. Redeploy — the pod should now start cleanly as a non-root user
+2. Upgrade the chart — the init container will run as root and `chown` the volume to the correct UID/GID before the main container starts
+3. Once the pods are running correctly, **disable** `fixPermissions` again (it is `false` by default and not needed once ownership is correct):
+```yaml
+redis:
+  initContainers:
+    fixPermissions:
+      enabled: false
 
-This is a one-time adjustment for redis and postgres deployment.
+database:
+  initContainers:
+    fixPermissions:
+      enabled: false
+```
+4. Upgrade again — the pods will now start cleanly without the init container
+
+This is a one-time adjustment for redis and postgres deployments.
 
 # PatchMon Helm Chart
 

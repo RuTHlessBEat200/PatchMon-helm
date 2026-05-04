@@ -111,6 +111,11 @@ database:
     runAsGroup: 70
     runAsNonRoot: true
   
+  # Init containers
+  initContainers:
+    fixPermissions:
+      enabled: false  # Enable temporarily if volume ownership is incorrect (e.g. wrong UID/GID on existing PVC)
+
   # Node selector
   nodeSelector: {}
   
@@ -202,6 +207,11 @@ redis:
     runAsGroup: 1000
     runAsNonRoot: true
   
+  # Init containers
+  initContainers:
+    fixPermissions:
+      enabled: false  # Enable temporarily if volume ownership is incorrect (e.g. wrong UID/GID on existing PVC)
+
   # Node selector
   nodeSelector: {}
   

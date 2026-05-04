@@ -37,6 +37,22 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        {{- if .Values.redis.initContainers.fixPermissions.enabled }}
+        - name: fix-permissions
+          image: busybox
+          command:
+            - sh
+            - "-c"
+            - "chown -R {{ .Values.redis.podSecurityContext.runAsUser }}:{{ .Values.redis.podSecurityContext.fsGroup }} /data"
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+        {{- end }}
       containers:
         - name: redis
           image: {{ include "patchmon.redis.image" . }}
